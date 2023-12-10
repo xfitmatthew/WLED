@@ -122,7 +122,7 @@ const ethernet_settings ethernetBoards[] = {
     23,                   // eth_mdc,
     18,                   // eth_mdio,
     ETH_PHY_LAN8720,      // eth_type,
-    ETH_CLOCK_GPIO17_OUT  // eth_clk_mode
+    ETH_CLOCK_GPIO0_OUT  // eth_clk_mode
   
 
   }
