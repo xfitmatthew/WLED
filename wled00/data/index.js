@@ -15,6 +15,8 @@ var pcMode = false, pcModeA = false, lastw = 0, wW;
 var simplifiedUI = false;
 var tr = 7;
 var d = document;
+const ranges = RangeTouch.setup('input[type="range"]', {});
+var retry = false;
 var palettesData;
 var fxdata = [];
 var pJson = {}, eJson = {}, lJson = {};
@@ -23,7 +25,7 @@ var pN = "", pI = 0, pNum = 0;
 var pmt = 1, pmtLS = 0, pmtLast = 0;
 var lastinfo = {};
 var isM = false, mw = 0, mh=0;
-var ws, cpick, ranges, wsRpt=0;
+var ws, wsRpt=0;
 var cfg = {
 	theme:{base:"dark", bg:{url:"", rnd: false, rndGrayscale: false, rndBlur: false}, alpha:{bg:0.6,tab:0.8}, color:{bg:""}},
 	comp :{colors:{picker: true, rgb: false, quick: true, hex: false},
@@ -38,6 +40,17 @@ var hol = [
 	[0,6,4,1,"https://images.alphacoders.com/516/516792.jpg"], // 4th of July
 	[0,0,1,1,"https://images.alphacoders.com/119/1198800.jpg"] // new year
 ];
+
+var cpick = new iro.ColorPicker("#picker", {
+	width: 260,
+	wheelLightness: false,
+	wheelAngle: 270,
+	wheelDirection: "clockwise",
+	layout: [{
+		component: iro.ui.Wheel,
+		options: {}
+	}]
+});
 
 function handleVisibilityChange() {if (!d.hidden && new Date () - lastUpdate > 3000) requestJson();}
 function sCol(na, col) {d.documentElement.style.setProperty(na, col);}
@@ -260,24 +273,30 @@ function onLoad()
 
 	selectSlot(0);
 	updateTablinks(0);
+	cpick.on("input:end", () => {setColor(1);});
+	cpick.on("color:change", () => {updatePSliders()});
 	pmtLS = localStorage.getItem('wledPmt');
 
 	// Load initial data
+	// Once we figure out why ESP8266 sometimes corrupts JSON responses if they are made in quick succession
+	// we can remove all setTimeout() throttling
 	loadPalettes(()=>{
-		// fill effect extra data array
-		loadFXData(()=>{
-			setTimeout(()=>{ // ESP8266 can't handle quick requests
-				// load and populate effects
-				loadFX(()=>{
-					setTimeout(()=>{ // ESP8266 can't handle quick requests
-						loadPalettesData(()=>{
-							requestJson();// will load presets and create WS
-							if (cfg.comp.css) setTimeout(()=>{loadSkinCSS('skinCss')},100);
-						});
-					},100);
-				});
-			},100);
-		});
+		setTimeout(()=>{ // ESP8266 can't handle quick requests
+			// fill effect extra data array
+			loadFXData(()=>{
+				setTimeout(()=>{ // ESP8266 can't handle quick requests
+					// load and populate effects
+					loadFX(()=>{
+						setTimeout(()=>{ // ESP8266 can't handle quick requests
+							loadPalettesData(()=>{
+								requestJson();// will load presets and create WS
+								if (cfg.comp.css) setTimeout(()=>{loadSkinCSS('skinCss')},100);
+							});
+						},50);
+					});
+				},50);
+			});
+		},50);
 	});
 	resetUtil();
 
@@ -501,8 +520,13 @@ function loadPalettes(callback = null)
 	.then((json)=>{
 		lJson = Object.entries(json);
 		populatePalettes();
+		retry = false;
 	})
 	.catch((e)=>{
+		if (!retry) {
+			retry = true;
+			setTimeout(loadPalettes, 500); // retry
+		}
 		showToast(e, true);
 	})
 	.finally(()=>{
@@ -523,9 +547,13 @@ function loadFX(callback = null)
 	.then((json)=>{
 		eJson = Object.entries(json);
 		populateEffects();
+		retry = false;
 	})
 	.catch((e)=>{
-		//setTimeout(loadFX, 250); // retry
+		if (!retry) {
+			retry = true;
+			setTimeout(loadFX, 500); // retry
+		}
 		showToast(e, true);
 	})
 	.finally(()=>{
@@ -548,10 +576,14 @@ function loadFXData(callback = null)
 		// add default value for Solid
 		fxdata.shift()
 		fxdata.unshift(";!;");
+		retry = false;
 	})
 	.catch((e)=>{
 		fxdata = [];
-		//setTimeout(loadFXData, 250); // retry
+		if (!retry) {
+			retry = true;
+			setTimeout(loadFXData, 500); // retry
+		}
 		showToast(e, true);
 	})
 	.finally(()=>{
@@ -1698,8 +1730,13 @@ function requestJson(command=null)
 			});
 		},25);
 		reqsLegal = true;
+		retry = false;
 	})
 	.catch((e)=>{
+		if (!retry) {
+			retry = true;
+			setTimeout(requestJson,500);
+		}
 		showToast(e, true);
 	});
 }
@@ -2758,8 +2795,10 @@ function search(field, listId = null) {
 	field.nextElementSibling.style.display = (field.value !== '') ? 'block' : 'none';
 	if (!listId) return;
 
+	const search = field.value !== '';
+
 	// clear filter if searching in fxlist
-	if (listId === 'fxlist' && field.value !== '') {
+	if (listId === 'fxlist' && search) {
 		gId("filters").querySelectorAll("input[type=checkbox]").forEach((e) => { e.checked = false; });
 	}
 
@@ -2793,6 +2832,12 @@ function search(field, listId = null) {
 	sortedListItems.forEach(item => {
 		gId(listId).append(item);
 	});
+
+	// scroll to first search result
+	const firstVisibleItem = sortedListItems.find(item => item.style.display !== 'none' && !item.classList.contains('sticky') && !item.classList.contains('selected'));
+	if (firstVisibleItem && search) {
+		firstVisibleItem.scrollIntoView({ behavior: "instant", block: "center" });
+	}
 }
 
 function clean(clearButton) {
