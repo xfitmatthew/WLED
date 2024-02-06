@@ -104,7 +104,7 @@ private:
 
   /**
    * Read and update PIR sensor state.
-   * Initilize/reset switch off timer
+   * Initialize/reset switch off timer
    */
   bool updatePIRsensorState();
 
@@ -533,7 +533,7 @@ bool PIRsensorSwitch::readFromConfig(JsonObject &root)
 
   JsonArray pins = top["pin"];
   if (!pins.isNull()) {
-    for (int i = 0; i < PIR_SENSOR_MAX_SENSORS; i++)
+    for (size_t i = 0; i < PIR_SENSOR_MAX_SENSORS; i++)
       if (i < pins.size()) PIRsensorPin[i] = pins[i] | PIRsensorPin[i];
   } else {
     PIRsensorPin[0] = top["pin"] | oldPin[0];
