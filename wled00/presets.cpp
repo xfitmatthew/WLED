@@ -56,11 +56,9 @@ static void doSaveState() {
     size_t len = measureJson(*fileDoc) + 1;
     DEBUG_PRINTLN(len);
     // if possible use SPI RAM on ESP32
-    #if defined(BOARD_HAS_PSRAM) && defined(WLED_USE_PSRAM)
     if (psramFound())
       tmpRAMbuffer = (char*) ps_malloc(len);
     else
-    #endif
       tmpRAMbuffer = (char*) malloc(len);
     if (tmpRAMbuffer!=nullptr) {
       serializeJson(*fileDoc, tmpRAMbuffer, len);
@@ -115,6 +113,15 @@ void initPresetsFile()
   }
   serializeJson(doc, f);
   f.close();
+}
+
+bool applyPresetFromPlaylist(byte index)
+{
+  DEBUG_PRINT(F("Request to apply preset: "));
+  DEBUG_PRINTLN(index);
+  presetToApply = index;
+  callModeToApply = CALL_MODE_DIRECT_CHANGE;
+  return true;
 }
 
 bool applyPreset(byte index, byte callMode)
