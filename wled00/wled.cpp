@@ -244,6 +244,7 @@ void WLED::loop()
     if (psramFound()) {
       DEBUG_PRINT(F("Total PSRAM: "));    DEBUG_PRINT(ESP.getPsramSize()/1024); DEBUG_PRINTLN("kB");
       DEBUG_PRINT(F("Free PSRAM: "));     DEBUG_PRINT(ESP.getFreePsram()/1024); DEBUG_PRINTLN("kB");
+      if (!psramSafe) DEBUG_PRINTLN(F("Not using PSRAM."));
     }
     #endif
     DEBUG_PRINT(F("Wifi state: "));      DEBUG_PRINTLN(WiFi.status());
@@ -367,7 +368,12 @@ void WLED::setup()
   DEBUG_PRINT(F("heap ")); DEBUG_PRINTLN(ESP.getFreeHeap());
 
 #if defined(ARDUINO_ARCH_ESP32)
-  pDoc = new PSRAMDynamicJsonDocument((psramFound() ? 2 : 1)*JSON_BUFFER_SIZE);
+  #ifndef BOARD_HAS_PSRAM
+  if (psramFound() && ESP.getChipRevision() < 3) psramSafe = false;
+  if (!psramSafe) DEBUG_PRINTLN(F("Not using PSRAM."));
+  #endif
+  pDoc = new PSRAMDynamicJsonDocument((psramSafe && psramFound() ? 2 : 1)*JSON_BUFFER_SIZE);
+  DEBUG_PRINT(F("JSON buffer allocated: ")); DEBUG_PRINTLN((psramSafe && psramFound() ? 2 : 1)*JSON_BUFFER_SIZE);
   // if the above fails requestJsonBufferLock() will always return false preventing crashes
   if (psramFound()) {
     DEBUG_PRINT(F("Total PSRAM: ")); DEBUG_PRINT(ESP.getPsramSize()/1024); DEBUG_PRINTLN("kB");
@@ -420,6 +426,7 @@ void WLED::setup()
 
   DEBUG_PRINTLN(F("Reading config"));
   deserializeConfigFromFS();
+  DEBUG_PRINT(F("heap ")); DEBUG_PRINTLN(ESP.getFreeHeap());
 
 #if defined(STATUSLED) && STATUSLED>=0
   if (!pinManager.isPinAllocated(STATUSLED)) {
